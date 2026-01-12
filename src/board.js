@@ -56,8 +56,26 @@ class Board {
             { isStatic: true, label: 'block' }
         );
 
+        const text = new PIXI.Text({
+            text: (colorId + 1).toString(),
+            style: {
+                fontFamily: 'Arial',
+                fontSize: 24,
+                fontWeight: 'bold',
+                fill: 0xffffff,
+                dropShadow: true,
+                dropShadowBlur: 4,
+                dropShadowColor: '0x000000',
+                dropShadowDistance: 2,
+            }
+        });
+        text.anchor.set(0.5);
+        text.x = GameConstants.BlockSize / 2;
+        text.y = GameConstants.BlockSize / 2;
+
         const blockData = {
             graphics: block,
+            text: text, // 텍스트 참조 저장
             body: body,
             x: x,
             y: y,
@@ -87,6 +105,7 @@ class Board {
         });
 
         this.container.addChild(block);
+        block.addChild(text); // 블록 위에 텍스트 추가
         this.blocks.set(`${x},${y}`, blockData);
         return blockData;
     }
@@ -256,18 +275,22 @@ class Board {
     }
 
     matchSuccess(b1, b2, path) {
-        // 이펙트 및 사운드 효과 (전역 싱글톤처럼 사용하거나 scene 참조 이용)
+        // 이펙트 및 사운드 효과
         if (this.scene.effects) {
             const centerX = (b1.graphics.x + b2.graphics.x) / 2;
             const centerY = (b1.graphics.y + b2.graphics.y) / 2;
 
             this.scene.effects.spawnExplosion(b1.graphics.x + 25, b1.graphics.y + 25, GameConstants.Colors[b1.colorId]);
-            this.scene.effects.spawnExplosion(b2.graphics.x + 25, b2.graphics.y + 25, GameConstants.Colors[b2.colorId]);
+            if (b1 !== b2) {
+                this.scene.effects.spawnExplosion(b2.graphics.x + 25, b2.graphics.y + 25, GameConstants.Colors[b2.colorId]);
+            }
 
-            // 경로 시각화 추가
-            this.scene.effects.drawMatchPath(path, GameConstants.Colors[b1.colorId]);
+            // 경로 시각화 추가 (경로가 있을 때만)
+            if (path) {
+                this.scene.effects.drawMatchPath(path, GameConstants.Colors[b1.colorId]);
+            }
 
-            // 콤보 계산용 (임시)
+            // 콤보 계산용
             const combo = parseInt(document.getElementById('combo-count').innerText) + 1;
             this.scene.effects.spawnComboText(centerX + 25, centerY + 25, combo);
 
@@ -276,18 +299,24 @@ class Board {
         }
 
         this.removeBlock(b1);
-        this.removeBlock(b2);
+        if (b1 !== b2) this.removeBlock(b2);
+
         this.selectedBlock = null;
         this.secondBlock = null;
         window.dispatchEvent(new CustomEvent('match', { detail: { path } }));
     }
 
     removeBlock(block) {
+        if (!block) return;
         if (block.graphics.parent) {
+            if (block.text && block.text.parent) {
+                block.graphics.removeChild(block.text);
+            }
             block.graphics.parent.removeChild(block.graphics);
         }
         if (block.body) {
             Matter.Composite.remove(this.scene.world, block.body);
+            block.body.blockData = null; // 순환 참조 방지
         }
         this.blocks.delete(`${block.x},${block.y}`);
     }

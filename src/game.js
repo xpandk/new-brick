@@ -44,7 +44,9 @@ class Game {
         const wallOptions = { isStatic: true, restitution: 1, friction: 0 };
         // 공이 gameLayer 안에서 움직이므로, 벽도 0과 boardWidth 위치에 있어야 함
         const leftLimit = Bodies.rectangle(-5, 2000, 10, 10000, wallOptions);
+        leftLimit.label = 'wall';
         const rightLimit = Bodies.rectangle(boardWidth + 5, 2000, 10, 10000, wallOptions);
+        rightLimit.label = 'wall';
         Composite.add(this.world, [leftLimit, rightLimit]);
 
         // 3. 벽 시각화
@@ -77,6 +79,68 @@ class Game {
 
             // 상단 UI 업데이트
             document.getElementById('combo-count').innerText = this.matchCombo;
+
+            // 브릭 매칭 시 공 숫자 증가 로직 잠시 해제 (USER 요청)
+            /*
+            if (this.ball) {
+                this.ball.incrementNumber();
+            }
+            */
+        });
+
+        // 5. 입력 이벤트 (변경: 위/아래 방향키, 숫자키 1-6 및 스페이스바)
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' || e.code === 'ArrowUp') {
+                this.ball.incrementNumber();
+            } else if (e.code === 'ArrowDown') {
+                this.ball.decrementNumber();
+            } else if (e.key >= '1' && e.key <= '6') {
+                this.ball.setNumber(parseInt(e.key));
+            }
+        });
+
+        // 6. 물리 충돌 이벤트 (공과 블록 매칭 파괴 및 좌우 반전)
+        Matter.Events.on(this.engine, 'collisionStart', (event) => {
+            event.pairs.forEach((pair) => {
+                const { bodyA, bodyB, collision } = pair;
+
+                let ballBody = (bodyA.label === 'ball') ? bodyA : (bodyB.label === 'ball' ? bodyB : null);
+                let otherBody = (ballBody === bodyA) ? bodyB : (ballBody === bodyB ? bodyA : null);
+
+                if (ballBody && otherBody) {
+                    if (Math.abs(collision.normal.x) > Math.abs(collision.normal.y)) {
+                        Matter.Body.setVelocity(ballBody, {
+                            x: -ballBody.velocity.x,
+                            y: ballBody.velocity.y
+                        });
+                    }
+
+                    if (otherBody.label === 'block' && otherBody.blockData) {
+                        const blockData = otherBody.blockData;
+                        if (this.ball.number === (blockData.colorId + 1)) {
+                            this.board.matchSuccess(blockData, blockData, null);
+                            this.ball.jump();
+                        }
+                    }
+                }
+            });
+        });
+
+        // 7. 연속 충돌 감지 (기존 collisionStart가 가끔 놓치는 경우 보완)
+        Matter.Events.on(this.engine, 'collisionActive', (event) => {
+            event.pairs.forEach((pair) => {
+                const { bodyA, bodyB } = pair;
+                let ballBody = (bodyA.label === 'ball') ? bodyA : (bodyB.label === 'ball' ? bodyB : null);
+                let blockBody = (bodyA.label === 'block') ? bodyA : (bodyB.label === 'block' ? bodyB : null);
+
+                if (ballBody && blockBody && blockBody.blockData) {
+                    const blockData = blockBody.blockData;
+                    if (this.ball.number === (blockData.colorId + 1)) {
+                        this.board.matchSuccess(blockData, blockData, null);
+                        this.ball.jump(); // 연속 충돌 판정에서도 점프!
+                    }
+                }
+            });
         });
 
         // 낙하 추적용 변수
