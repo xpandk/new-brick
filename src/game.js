@@ -23,7 +23,7 @@ class Game {
         this.engine = Engine.create();
         this.world = this.engine.world;
         // 중력 설정 (속도 감소에 맞춰 0.5로 조정)
-        this.engine.gravity.y = 0.5;
+        this.engine.gravity.y = 0.2;  // 0.2로 조정
 
         const boardWidth = GameConstants.Cols * GameConstants.BlockSize;
         const screenWidth = this.app.screen.width;
